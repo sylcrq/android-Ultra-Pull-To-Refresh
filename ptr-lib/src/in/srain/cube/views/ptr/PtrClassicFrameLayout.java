@@ -5,7 +5,7 @@ import android.util.AttributeSet;
 
 public class PtrClassicFrameLayout extends PtrFrameLayout {
 
-    private PtrClassicDefaultHeader mPtrClassicHeader;
+    protected PtrClassicDefaultHeader mPtrClassicHeader;
 
     public PtrClassicFrameLayout(Context context) {
         super(context);
@@ -22,7 +22,7 @@ public class PtrClassicFrameLayout extends PtrFrameLayout {
         initViews();
     }
 
-    private void initViews() {
+    protected void initViews() {
         mPtrClassicHeader = new PtrClassicDefaultHeader(getContext());
         setHeaderView(mPtrClassicHeader);
         addPtrUIHandler(mPtrClassicHeader);

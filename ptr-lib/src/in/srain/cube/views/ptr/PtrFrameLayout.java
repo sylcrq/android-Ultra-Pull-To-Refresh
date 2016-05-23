@@ -6,6 +6,10 @@ import android.util.AttributeSet;
 import android.view.*;
 import android.widget.Scroller;
 import android.widget.TextView;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import in.srain.cube.views.ptr.indicator.PtrIndicator;
 import in.srain.cube.views.ptr.util.PtrCLog;
 
@@ -36,18 +40,21 @@ public class PtrFrameLayout extends ViewGroup {
     // optional config for define header and content in xml file
     private int mHeaderId = 0;
     private int mContainerId = 0;
+    private int mFooterId = 0;
     // config
     private int mDurationToClose = 200;
     private int mDurationToCloseHeader = 1000;
     private boolean mKeepHeaderWhenRefresh = true;
     private boolean mPullToRefresh = false;
-    private View mHeaderView;
+    private View mHeaderView;  // Header View
+    private View mFooterView;  // Footer View
     private PtrUIHandlerHolder mPtrUIHandlerHolder = PtrUIHandlerHolder.create();
     private PtrHandler mPtrHandler;
     // working parameters
     private ScrollChecker mScrollChecker;
     private int mPagingTouchSlop;
-    private int mHeaderHeight;
+    private int mHeaderHeight;  // Header View Height
+    private int mFooterHeight;  // Footer View Height
     private boolean mDisableWhenHorizontalMove = false;
     private int mFlag = 0x00;
 
@@ -113,8 +120,64 @@ public class PtrFrameLayout extends ViewGroup {
     @Override
     protected void onFinishInflate() {
         final int childCount = getChildCount();
-        if (childCount > 2) {
-            throw new IllegalStateException("PtrFrameLayout can only contains 2 children");
+
+        // 最多三个子View: Header, Content, Footer
+        if (childCount > 3) {
+            throw new IllegalStateException("PtrFrameLayout can only contains 3 children");
+        } else if (childCount == 3) {
+            if (mHeaderId != 0 && mHeaderView == null) {
+                mHeaderView = findViewById(mHeaderId);
+            }
+            if (mContainerId != 0 && mContent == null) {
+                mContent = findViewById(mContainerId);
+            }
+            if (mFooterId != 0 && mFooterView == null) {
+                mFooterView = findViewById(mFooterId);
+            }
+
+            // not specify header or content or footer
+            if (mContent == null || mHeaderView == null || mFooterView == null) {
+                View child1 = getChildAt(0);
+                View child2 = getChildAt(1);
+                View child3 = getChildAt(2);
+
+                if (mContent == null && mHeaderView == null && mFooterView == null) {
+                    // TODO: 16/6/13 顺序?
+                    mHeaderView = child1;
+                    mContent = child2;
+                    mFooterView = child3;
+                } else {
+                    List<View> views = new ArrayList<>();
+                    views.add(child1);
+                    views.add(child2);
+                    views.add(child3);
+
+                    // 去掉不为空的子View
+                    if (mHeaderView != null) {
+                        views.remove(mHeaderView);
+                    }
+                    if (mContent != null) {
+                        views.remove(mContent);
+                    }
+                    if (mFooterView != null) {
+                        views.remove(mFooterView);
+                    }
+
+                    // TODO: 16/6/13 顺序?
+                    if (mHeaderView == null && views.size() > 0) {
+                        mHeaderView = views.get(0);
+                        views.remove(0);
+                    }
+                    if (mContent == null && views.size() > 0) {
+                        mContent = views.get(0);
+                        views.remove(0);
+                    }
+                    if (mFooterView == null && views.size() > 0) {
+                        mFooterView = views.get(0);
+                        views.remove(0);
+                    }
+                }
+            }
         } else if (childCount == 2) {
             if (mHeaderId != 0 && mHeaderView == null) {
                 mHeaderView = findViewById(mHeaderId);
@@ -125,7 +188,6 @@ public class PtrFrameLayout extends ViewGroup {
 
             // not specify header or content
             if (mContent == null || mHeaderView == null) {
-
                 View child1 = getChildAt(0);
                 View child2 = getChildAt(1);
                 if (child1 instanceof PtrUIHandler) {
@@ -162,8 +224,12 @@ public class PtrFrameLayout extends ViewGroup {
             mContent = errorView;
             addView(mContent);
         }
+
         if (mHeaderView != null) {
             mHeaderView.bringToFront();
+        }
+        if (mFooterView != null) {
+            mFooterView.bringToFront();
         }
         super.onFinishInflate();
     }
@@ -209,6 +275,13 @@ public class PtrFrameLayout extends ViewGroup {
                         mPtrIndicator.getCurrentPosY(), mPtrIndicator.getLastPosY(), mContent.getTop());
             }
         }
+
+        if (mFooterView != null) {
+            measureChildWithMargins(mFooterView, widthMeasureSpec, 0, heightMeasureSpec, 0);
+            MarginLayoutParams lp = (MarginLayoutParams) mFooterView.getLayoutParams();
+            mFooterHeight = mFooterView.getMeasuredHeight() + lp.topMargin + lp.bottomMargin;
+            mPtrIndicator.setFooterHeight(mFooterHeight);
+        }
     }
 
     private void measureContentView(View child,
@@ -230,11 +303,12 @@ public class PtrFrameLayout extends ViewGroup {
     }
 
     private void layoutChildren() {
-        int offset = mPtrIndicator.getCurrentPosY();
+        int offset = mPtrIndicator.getCurrentPosY();  // Header/Footer位置偏移量
         int paddingLeft = getPaddingLeft();
         int paddingTop = getPaddingTop();
+        int contentBottom = 0;
 
-        if (mHeaderView != null) {
+        if (mHeaderView != null && mPtrIndicator.isHeader()) {
             MarginLayoutParams lp = (MarginLayoutParams) mHeaderView.getLayoutParams();
             final int left = paddingLeft + lp.leftMargin;
             // enhance readability(header is layout above screen when first init)
@@ -252,13 +326,30 @@ public class PtrFrameLayout extends ViewGroup {
             }
             MarginLayoutParams lp = (MarginLayoutParams) mContent.getLayoutParams();
             final int left = paddingLeft + lp.leftMargin;
-            final int top = paddingTop + lp.topMargin + offset;
+            final int top;
+            if (mPtrIndicator.isHeader()) {
+                top = paddingTop + lp.topMargin + offset;
+            } else {
+                top = paddingTop + lp.topMargin - offset;
+            }
             final int right = left + mContent.getMeasuredWidth();
             final int bottom = top + mContent.getMeasuredHeight();
+            contentBottom = bottom;
             if (isDebug()) {
                 PtrCLog.d(LOG_TAG, "onLayout content: %s %s %s %s", left, top, right, bottom);
             }
             mContent.layout(left, top, right, bottom);
+        }
+        if (mFooterView != null && !mPtrIndicator.isHeader()) {
+            MarginLayoutParams lp = (MarginLayoutParams) mFooterView.getLayoutParams();
+            final int left = paddingLeft + lp.leftMargin;
+            final int top = contentBottom + paddingTop + lp.topMargin;
+            final int right = left + mFooterView.getMeasuredWidth();
+            final int bottom = top + mFooterView.getMeasuredHeight();
+            mFooterView.layout(left, top, right, bottom);
+            if (isDebug()) {
+                PtrCLog.d(LOG_TAG, "onLayout footer: %s %s %s %s", left, top, right, bottom);
+            }
         }
     }
 
@@ -319,30 +410,85 @@ public class PtrFrameLayout extends ViewGroup {
                         mPreventForHorizontal = true;
                     }
                 }
+                // 不处理横向滑动
                 if (mPreventForHorizontal) {
                     return dispatchTouchEventSupper(e);
                 }
 
+                // 当前是否为下滑
                 boolean moveDown = offsetY > 0;
+                // 当前是否为上滑
                 boolean moveUp = !moveDown;
-                boolean canMoveUp = mPtrIndicator.hasLeftStartPosition();
+
+                // Header是否可见
+                boolean canMoveUp = mPtrIndicator.isHeader() && mPtrIndicator.hasLeftStartPosition();
+                // Footer是否可见
+                boolean canMoveDown = mFooterView != null && !mPtrIndicator.isHeader() && mPtrIndicator.hasLeftStartPosition();
+
+                // Header可以下拉
+                boolean canHeaderMoveDown = mPtrHandler != null && mPtrHandler.checkCanDoRefresh(this, mContent, mHeaderView);
+                // Footer可以上拉
+                boolean canFooterMoveUp = mFooterView != null && mPtrHandler != null && (mPtrHandler instanceof PtrLoadMoreHandler) &&
+                        ((PtrLoadMoreHandler) mPtrHandler).checkCanLoadMore(this, mContent, mFooterView);
 
                 if (DEBUG) {
-                    boolean canMoveDown = mPtrHandler != null && mPtrHandler.checkCanDoRefresh(this, mContent, mHeaderView);
-                    PtrCLog.v(LOG_TAG, "ACTION_MOVE: offsetY:%s, currentPos: %s, moveUp: %s, canMoveUp: %s, moveDown: %s: canMoveDown: %s", offsetY, mPtrIndicator.getCurrentPosY(), moveUp, canMoveUp, moveDown, canMoveDown);
+                    PtrCLog.v(LOG_TAG, "ACTION_MOVE: offsetY:%s, currentPos: %s, moveUp: %s, canMoveUp: %s, moveDown: %s: canMoveDown: %s",
+                            offsetY, mPtrIndicator.getCurrentPosY(), moveUp, canMoveUp, moveDown, canMoveDown);
                 }
 
-                // disable move when header not reach top
-                if (moveDown && mPtrHandler != null && !mPtrHandler.checkCanDoRefresh(this, mContent, mHeaderView)) {
-                    return dispatchTouchEventSupper(e);
+                if (!canMoveUp && !canMoveDown) {
+                    // Header/Footer目前都未显示
+                    if (moveDown && !canHeaderMoveDown) {
+                        return dispatchTouchEventSupper(e);
+                    }
+                    if (moveUp && !canFooterMoveUp) {
+                        return dispatchTouchEventSupper(e);
+                    }
+
+                    if (moveDown) {
+                        moveHeaderPos(offsetY);
+                        return true;
+                    }
+
+                    if (moveUp) {
+                        moveFooterPos(offsetY);
+                        return true;
+                    }
                 }
 
-                if ((moveUp && canMoveUp) || moveDown) {
-                    movePos(offsetY);
+                if (canMoveUp) {
+                    // 当前显示的是Header
+                    moveHeaderPos(offsetY);
+                    return true;
+                }
+
+                if (canMoveDown) {
+                    // 当前显示的是Footer
+                    moveFooterPos(offsetY);
                     return true;
                 }
         }
         return dispatchTouchEventSupper(e);
+    }
+
+    /**
+     * 移动Header View
+     *
+     * @param deltaY
+     */
+    private void moveHeaderPos(float deltaY) {
+        mPtrIndicator.setIsHeader(true);
+        movePos(deltaY);
+    }
+
+    /**
+     * 移动Footer View
+     *
+     * @param deltaY
+     */
+    private void moveFooterPos(float deltaY) {
+        mPtrIndicator.setIsHeader(false);
+        movePos(-deltaY);  // 上滑deltaY为负值
     }
 
     /**
@@ -371,7 +517,7 @@ public class PtrFrameLayout extends ViewGroup {
 
         mPtrIndicator.setCurrentPos(to);
         int change = to - mPtrIndicator.getLastPosY();
-        updatePos(change);
+        updatePos(mPtrIndicator.isHeader() ? change : -change);
     }
 
     private void updatePos(int change) {
@@ -426,7 +572,12 @@ public class PtrFrameLayout extends ViewGroup {
                     change, mPtrIndicator.getCurrentPosY(), mPtrIndicator.getLastPosY(), mContent.getTop(), mHeaderHeight);
         }
 
-        mHeaderView.offsetTopAndBottom(change);
+        if (mPtrIndicator.isHeader()) {
+            mHeaderView.offsetTopAndBottom(change);
+        } else {
+            mFooterView.offsetTopAndBottom(change);
+        }
+
         if (!isPinContent()) {
             mContent.offsetTopAndBottom(change);
         }
@@ -542,7 +693,15 @@ public class PtrFrameLayout extends ViewGroup {
             }
         }
         if (mPtrHandler != null) {
-            mPtrHandler.onRefreshBegin(this);
+            if (mPtrIndicator.isHeader()) {
+                // 下拉刷新回调
+                mPtrHandler.onRefreshBegin(this);
+            } else {
+                // 加载更多回调
+                if (mPtrHandler instanceof PtrLoadMoreHandler) {
+                    ((PtrLoadMoreHandler) mPtrHandler).onLoadMoreBegin(this);
+                }
+            }
         }
     }
 
@@ -881,6 +1040,11 @@ public class PtrFrameLayout extends ViewGroup {
         return mHeaderView;
     }
 
+    /**
+     * 添加Header
+     *
+     * @param header
+     */
     public void setHeaderView(View header) {
         if (mHeaderView != null && header != null && mHeaderView != header) {
             removeView(mHeaderView);
@@ -892,6 +1056,26 @@ public class PtrFrameLayout extends ViewGroup {
         }
         mHeaderView = header;
         addView(header);
+    }
+
+    /**
+     * 添加Footer
+     *
+     * @param footer
+     */
+    public void setFooterView(View footer) {
+        if (mFooterView != null && footer != null && mFooterView != footer) {
+            removeView(mFooterView);
+        }
+
+        ViewGroup.LayoutParams lp = footer.getLayoutParams();
+        if (lp == null) {
+            lp = new LayoutParams(-1, -2);
+            footer.setLayoutParams(lp);
+        }
+
+        mFooterView = footer;
+        addView(footer);
     }
 
     @Override
@@ -982,7 +1166,11 @@ public class PtrFrameLayout extends ViewGroup {
             }
             if (!finish) {
                 mLastFlingY = curY;
-                movePos(deltaY);
+                if (mPtrIndicator.isHeader()) {
+                    moveHeaderPos(deltaY);
+                } else {
+                    moveFooterPos(-deltaY);
+                }
                 post(this);
             } else {
                 finish();

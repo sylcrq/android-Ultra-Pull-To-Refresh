@@ -2,24 +2,40 @@ package in.srain.cube.views.ptr.indicator;
 
 import android.graphics.PointF;
 
+/**
+ * 辅助类
+ */
 public class PtrIndicator {
 
     public final static int POS_START = 0;
     protected int mOffsetToRefresh = 0;
+    protected int mOffsetToLoadMore = 0;
     private PointF mPtLastMove = new PointF();
     private float mOffsetX;
     private float mOffsetY;
     private int mCurrentPos = 0;
     private int mLastPos = 0;
-    private int mHeaderHeight;
+    private int mHeaderHeight;  // Header View Height
+    private int mFooterHeight;  // Footer View Height
     private int mPressedPos = 0;
 
     private float mRatioOfHeaderHeightToRefresh = 1.2f;
     private float mResistance = 1.7f;
     private boolean mIsUnderTouch = false;
+    // 刷新时显示Header的高度
     private int mOffsetToKeepHeaderWhileLoading = -1;
     // record the refresh complete position
     private int mRefreshCompleteY = 0;
+
+    private boolean mIsHeader = true;  // 当前是否为Header
+
+    public boolean isHeader() {
+        return mIsHeader;
+    }
+
+    public void setIsHeader(boolean isHeader) {
+        mIsHeader = isHeader;
+    }
 
     public boolean isUnderTouch() {
         return mIsUnderTouch;
@@ -123,8 +139,14 @@ public class PtrIndicator {
         updateHeight();
     }
 
+    public void setFooterHeight(int height) {
+        mFooterHeight = height;
+        updateHeight();
+    }
+
     protected void updateHeight() {
         mOffsetToRefresh = (int) (mRatioOfHeaderHeightToRefresh * mHeaderHeight);
+        mOffsetToLoadMore = (int) (mRatioOfHeaderHeightToRefresh * mFooterHeight);
     }
 
     public void convertFrom(PtrIndicator ptrSlider) {
@@ -174,7 +196,8 @@ public class PtrIndicator {
     }
 
     public int getOffsetToKeepHeaderWhileLoading() {
-        return mOffsetToKeepHeaderWhileLoading >= 0 ? mOffsetToKeepHeaderWhileLoading : mHeaderHeight;
+        final int height = mIsHeader ? mHeaderHeight : mFooterHeight;
+        return mOffsetToKeepHeaderWhileLoading >= 0 ? mOffsetToKeepHeaderWhileLoading : height;
     }
 
     public boolean isAlreadyHere(int to) {

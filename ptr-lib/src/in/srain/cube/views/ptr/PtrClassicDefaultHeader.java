@@ -10,12 +10,17 @@ import android.view.View;
 import android.view.animation.LinearInterpolator;
 import android.view.animation.RotateAnimation;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
+
 import in.srain.cube.views.ptr.indicator.PtrIndicator;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+/**
+ * 下拉刷新Header默认实现
+ */
 public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler {
 
     private final static String KEY_SharedPreferences = "cube_ptr_classic_last_update";
@@ -23,12 +28,12 @@ public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler
     private int mRotateAniTime = 150;
     private RotateAnimation mFlipAnimation;
     private RotateAnimation mReverseFlipAnimation;
-    private TextView mTitleTextView;
-    private View mRotateView;
+    protected TextView mTitleTextView;
+    protected ImageView mRotateView;  // 箭头
     private View mProgressBar;
-    private long mLastUpdateTime = -1;
+    private long mLastUpdateTime = -1;  // 上次更新时间
     private TextView mLastUpdateTextView;
-    private String mLastUpdateTimeKey;
+    private String mLastUpdateTimeKey;  // 存储上次更新时间KEY
     private boolean mShouldShowLastUpdate;
 
     private LastUpdateTimeUpdater mLastUpdateTimeUpdater = new LastUpdateTimeUpdater();
@@ -56,7 +61,7 @@ public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler
         buildAnimation();
         View header = LayoutInflater.from(getContext()).inflate(R.layout.cube_ptr_classic_default_header, this);
 
-        mRotateView = header.findViewById(R.id.ptr_classic_header_rotate_view);
+        mRotateView = (ImageView) header.findViewById(R.id.ptr_classic_header_rotate_view);
 
         mTitleTextView = (TextView) header.findViewById(R.id.ptr_classic_header_rotate_view_header_title);
         mLastUpdateTextView = (TextView) header.findViewById(R.id.ptr_classic_header_rotate_view_header_last_update);
@@ -102,6 +107,9 @@ public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler
         setLastUpdateTimeKey(object.getClass().getName());
     }
 
+    /**
+     * 箭头翻转动画
+     */
     private void buildAnimation() {
         mFlipAnimation = new RotateAnimation(0, -180, RotateAnimation.RELATIVE_TO_SELF, 0.5f, RotateAnimation.RELATIVE_TO_SELF, 0.5f);
         mFlipAnimation.setInterpolator(new LinearInterpolator());
@@ -124,6 +132,11 @@ public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler
         mRotateView.setVisibility(INVISIBLE);
     }
 
+    /**
+     * 下拉刷新完毕,重置view
+     *
+     * @param frame
+     */
     @Override
     public void onUIReset(PtrFrameLayout frame) {
         resetView();
@@ -131,9 +144,13 @@ public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler
         tryUpdateLastUpdateTime();
     }
 
+    /**
+     * 下拉开始
+     *
+     * @param frame
+     */
     @Override
     public void onUIRefreshPrepare(PtrFrameLayout frame) {
-
         mShouldShowLastUpdate = true;
         tryUpdateLastUpdateTime();
         mLastUpdateTimeUpdater.start();
@@ -149,6 +166,11 @@ public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler
         }
     }
 
+    /**
+     * 开始刷新
+     *
+     * @param frame
+     */
     @Override
     public void onUIRefreshBegin(PtrFrameLayout frame) {
         mShouldShowLastUpdate = false;
@@ -161,6 +183,11 @@ public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler
         mLastUpdateTimeUpdater.stop();
     }
 
+    /**
+     * 刷新完毕
+     *
+     * @param frame
+     */
     @Override
     public void onUIRefreshComplete(PtrFrameLayout frame) {
 
@@ -231,6 +258,14 @@ public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler
         return sb.toString();
     }
 
+    /**
+     * 下拉过程中
+     *
+     * @param frame
+     * @param isUnderTouch
+     * @param status
+     * @param ptrIndicator
+     */
     @Override
     public void onUIPositionChange(PtrFrameLayout frame, boolean isUnderTouch, byte status, PtrIndicator ptrIndicator) {
 
@@ -257,14 +292,14 @@ public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler
         }
     }
 
-    private void crossRotateLineFromTopUnderTouch(PtrFrameLayout frame) {
+    protected void crossRotateLineFromTopUnderTouch(PtrFrameLayout frame) {
         if (!frame.isPullToRefresh()) {
             mTitleTextView.setVisibility(VISIBLE);
             mTitleTextView.setText(R.string.cube_ptr_release_to_refresh);
         }
     }
 
-    private void crossRotateLineFromBottomUnderTouch(PtrFrameLayout frame) {
+    protected void crossRotateLineFromBottomUnderTouch(PtrFrameLayout frame) {
         mTitleTextView.setVisibility(VISIBLE);
         if (frame.isPullToRefresh()) {
             mTitleTextView.setText(getResources().getString(R.string.cube_ptr_pull_down_to_refresh));

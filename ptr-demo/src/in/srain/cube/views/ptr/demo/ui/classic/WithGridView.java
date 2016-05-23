@@ -9,6 +9,7 @@ import android.widget.AdapterView;
 import android.widget.GridView;
 import android.widget.ImageView.ScaleType;
 import android.widget.LinearLayout;
+
 import in.srain.cube.image.CubeImageView;
 import in.srain.cube.image.ImageLoader;
 import in.srain.cube.image.ImageLoaderFactory;
@@ -21,8 +22,10 @@ import in.srain.cube.views.list.ViewHolderBase;
 import in.srain.cube.views.list.ViewHolderCreator;
 import in.srain.cube.views.ptr.PtrClassicFrameLayout;
 import in.srain.cube.views.ptr.PtrDefaultHandler;
+import in.srain.cube.views.ptr.PtrLoadMoreDefaultHandler;
 import in.srain.cube.views.ptr.PtrFrameLayout;
-import in.srain.cube.views.ptr.PtrHandler;
+import in.srain.cube.views.ptr.PtrLoadMoreHandler;
+import in.srain.cube.views.ptr.PtrLoadMoreFrameLayout;
 import in.srain.cube.views.ptr.demo.R;
 import in.srain.cube.views.ptr.demo.data.DemoRequestData;
 import in.srain.cube.views.ptr.demo.ui.MaterialStyleFragment;
@@ -32,7 +35,7 @@ public class WithGridView extends TitleBaseFragment {
     private static final int sGirdImageSize = (LocalDisplay.SCREEN_WIDTH_PIXELS - LocalDisplay.dp2px(12 + 12 + 10)) / 2;
     private ImageLoader mImageLoader;
     private ListViewDataAdapter<JsonData> mAdapter;
-    private PtrClassicFrameLayout mPtrFrame;
+    private PtrLoadMoreFrameLayout mPtrFrame;
 
     @Override
     public View createView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -63,9 +66,9 @@ public class WithGridView extends TitleBaseFragment {
         });
         gridListView.setAdapter(mAdapter);
 
-        mPtrFrame = (PtrClassicFrameLayout) contentView.findViewById(R.id.rotate_header_grid_view_frame);
+        mPtrFrame = (PtrLoadMoreFrameLayout) contentView.findViewById(R.id.rotate_header_grid_view_frame);
         mPtrFrame.setLastUpdateTimeRelateObject(this);
-        mPtrFrame.setPtrHandler(new PtrHandler() {
+        mPtrFrame.setPtrHandler(new PtrLoadMoreHandler() {
             @Override
             public void onRefreshBegin(PtrFrameLayout frame) {
                 updateData();
@@ -74,6 +77,16 @@ public class WithGridView extends TitleBaseFragment {
             @Override
             public boolean checkCanDoRefresh(PtrFrameLayout frame, View content, View header) {
                 return PtrDefaultHandler.checkContentCanBePulledDown(frame, content, header);
+            }
+
+            @Override
+            public void onLoadMoreBegin(PtrFrameLayout frame) {
+                loadMore();
+            }
+
+            @Override
+            public boolean checkCanLoadMore(PtrFrameLayout frame, View content, View footer) {
+                return PtrLoadMoreDefaultHandler.checkContentCanBePulledUp(frame, content, footer);
             }
         });
         // the following are default settings
@@ -109,6 +122,22 @@ public class WithGridView extends TitleBaseFragment {
                     @Override
                     public void run() {
                         mAdapter.getDataList().clear();
+                        mAdapter.getDataList().addAll(data.optJson("data").optJson("list").toArrayList());
+                        mPtrFrame.refreshComplete();
+                        mAdapter.notifyDataSetChanged();
+                    }
+                }, 0);
+            }
+        });
+    }
+
+    protected void loadMore() {
+        DemoRequestData.getImageList(new RequestFinishHandler<JsonData>() {
+            @Override
+            public void onRequestFinish(final JsonData data) {
+                mPtrFrame.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
                         mAdapter.getDataList().addAll(data.optJson("data").optJson("list").toArrayList());
                         mPtrFrame.refreshComplete();
                         mAdapter.notifyDataSetChanged();
