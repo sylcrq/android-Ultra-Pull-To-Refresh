@@ -5,7 +5,6 @@ import android.util.AttributeSet;
 
 /**
  * 上拉加载更多Footer默认实现
- * <p/>
  * Created by Shen YunLong on 2016/05/23.
  */
 public class PtrClassicDefaultFooter extends PtrClassicDefaultHeader {
